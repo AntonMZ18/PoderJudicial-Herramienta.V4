@@ -320,8 +320,16 @@
           <textarea id="textoDocumentoExtraido" style="min-height:220px;" placeholder="Acá aparecerá el contenido del documento..."></textarea>
           <div class="fila-acciones">
             <input id="tituloDocumento" placeholder="Título del material" style="flex:1;min-width:220px;padding:8px 10px;border:1px solid var(--line);border-radius:4px;background:#fffdf6;">
+            <select id="modoResumenDocumento">
+              <option value="completo">📚 Resumen completo</option>
+              <option value="estudio">📝 Resumen de estudio</option>
+              <option value="repaso">⚡ Repaso rápido</option>
+            </select>
+            <button class="btn-secundario" id="btnResumirDocumento">🧠 Resumir con cobertura</button>
             <button class="btn-secundario" id="btnGuardarDocumento">💾 Guardar en biblioteca</button>
           </div>
+          <div id="estadoResumenDocumento" class="ayuda" style="margin-top:10px;"></div>
+          <div id="resultadoResumenDocumento"></div>
         </div>
       </div>
 
@@ -653,6 +661,11 @@ function renderClases(){
         <div class="clase-body">
           <textarea placeholder="Pegá acá las notas / documentos de esta clase...">${c.notas}</textarea>
           <div class="fila-acciones">
+            <select data-resumen-modo title="Tipo de resumen">
+              <option value="completo">📚 Resumen completo (máxima cobertura)</option>
+              <option value="estudio">📝 Resumen de estudio</option>
+              <option value="repaso">⚡ Repaso rápido</option>
+            </select>
             <button class="sello-btn" data-accion="resumen">Generar resumen y preguntas</button>
             <button class="btn-secundario" data-accion="marcar">${c.estudiada?'Marcar pendiente':'Marcar estudiada'}</button>
             <span class="cargando" data-loader style="display:none;">Redactando el resumen…</span>
@@ -685,8 +698,11 @@ function renderClases(){
       const loader = item.querySelector('[data-loader]');
       btn.disabled = true; loader.style.display='inline';
       try{
-        const data = await generarResumenYPreguntas(textarea.value);
+        const modo = item.querySelector('[data-resumen-modo]').value;
+        const data = await generarResumenYPreguntas(textarea.value, modo);
         c.resumen = data.resumen; c.preguntas = data.preguntas || [];
+        c.coberturaResumen = data.cobertura || null;
+        c.modoResumen = modo;
         await guardarClases();
         mostrarResumen(item, c);
         renderSelectorQuiz();
@@ -708,6 +724,7 @@ function mostrarResumen(item, c){
       <span class="sello-marca">GENERADO</span>
       <h4>Resumen de la clase</h4>
       <div class="cuerpo">${escapeHtml(c.resumen)}</div>
+      <p class="ayuda">Modo: ${escapeHtml(c.modoResumen || 'completo')} · Cobertura: ${c.coberturaResumen ? `${c.coberturaResumen.cubiertos}/${c.coberturaResumen.total} bloques revisados (${c.coberturaResumen.porcentaje}%)` : 'sin auditoría disponible'}.</p>
       <p class="ayuda" style="margin-bottom:0;">Se generaron ${c.preguntas.length} preguntas de práctica. Andá a la pestaña "Práctica" para rendirlas.</p>
     </div>`;
 }
@@ -746,17 +763,39 @@ function extraerJson(texto){
   return JSON.parse(limpio.slice(inicio, fin+1));
 }
 
-async function generarResumenYPreguntas(notas){
-  const sistema = `Sos un tutor experto en Derecho argentino que prepara aspirantes al examen de ingreso al Poder Judicial de Corrientes, para el puesto de Oficial de Justicia Junior. Este es el Programa oficial del Cursillo Nivelatorio, para que uses la misma terminología y organización temática:
-
-${textoTemarioPlano()}
-
-Recibís notas de una clase (a veces desordenadas, tomadas de un streaming en vivo, o de dictado por voz) y devolvés SOLO un objeto JSON válido, sin texto adicional ni backticks, con esta forma exacta:
-{"resumen": "texto del resumen", "preguntas": [{"pregunta":"...", "opciones":["a","b","c","d"], "correcta": 0, "explicacion":"..."}]}
-El "resumen" debe tener: una definición directa de cada concepto clave, el desglose en elementos usando letras (a, b, c...) cuando corresponda, y un ejemplo concreto al final de cada bloque. Si las notas mencionan algo relacionado a un punto del programa oficial, usá exactamente esa terminología. Usá tono técnico-jurídico, claro y breve. Generá entre 4 y 6 "preguntas" de opción múltiple (4 opciones cada una, solo una correcta), con nivel de examen de ingreso, y una "explicacion" breve de por qué es correcta.`;
-  const texto = await llamarClaude(sistema, "Notas de la clase:\n\n" + notas);
-  return extraerJson(texto);
+function dividirParaCobertura(texto, limite=11000){
+  const bloques = texto.split(/\n{2,}|(?=--- PÁGINA \d+ ---)/).map(x=>x.trim()).filter(Boolean);
+  const partes=[]; let actual='';
+  for(const bloque of bloques){
+    if((actual+'\n\n'+bloque).length>limite && actual){ partes.push(actual); actual=bloque; }
+    else actual += (actual?'\n\n':'')+bloque;
+  }
+  if(actual) partes.push(actual);
+  return partes.length?partes:[texto];
 }
+
+function instruccionesResumen(modo){
+  if(modo==='repaso') return 'Hacé un repaso breve, pero no inventes ni cambies requisitos, excepciones, diferencias o procedimientos. Marcá lo que debe repasarse en el material completo.';
+  if(modo==='estudio') return 'Ordená el contenido para estudiar, eliminando sólo repeticiones. Conservá todos los conceptos, requisitos, excepciones, diferencias y procedimientos relevantes.';
+  return 'Prioridad absoluta: máxima cobertura. No hagas un resumen agresivo. Conservá todos los puntos relevantes, definiciones, requisitos, excepciones, diferencias, procedimientos, listas y advertencias. Si una parte es poco clara, indicá la duda en vez de inventar.';
+}
+
+async function generarResumenYPreguntas(notas, modo='completo'){
+  const partes=dividirParaCobertura(notas);
+  const sistemaBase = `Sos un tutor de preparación jurídica. Trabajás exclusivamente con el material recibido. No agregues conocimiento externo, no inventes y no completes vacíos. ${instruccionesResumen(modo)}\n\nRegla de cobertura: cada bloque recibido debe ser leído y representado en la salida o marcado expresamente como ilegible/ambiguo. Conservá la terminología del material y su organización cuando sea posible.`;
+  const resúmenes=[];
+  for(let i=0;i<partes.length;i++){
+    const salida=await llamarClaude(sistemaBase, `BLOQUE ${i+1} DE ${partes.length}:\n\n${partes[i]}\n\nDevolvé únicamente el resumen de este bloque, sin preguntas.`);
+    resúmenes.push(salida.trim());
+  }
+  const combinado=resúmenes.join('\n\n');
+  const sistemaFinal=`Sos un editor jurídico. Uní los resúmenes parciales en un único resumen fiel al material. ${instruccionesResumen(modo)} No elimines contenido sólo para hacerlo corto. Mantené títulos y subtítulos cuando existan. Después generá entre 4 y 6 preguntas de práctica basadas solamente en el material. Devolvé SOLO JSON válido: {"resumen":"...","preguntas":[{"pregunta":"...","opciones":["a","b","c","d"],"correcta":0,"explicacion":"..."}]}`;
+  const texto=await llamarClaude(sistemaFinal, `RESÚMENES DE ${partes.length} BLOQUES:\n\n${combinado}`);
+  const data=extraerJson(texto);
+  data.cobertura={total:partes.length,cubiertos:resúmenes.filter(Boolean).length,porcentaje:Math.round((resúmenes.filter(Boolean).length/partes.length)*100)};
+  return data;
+}
+
 
 /* ---- QUIZ ---- */
 function renderSelectorQuiz(){
@@ -1106,6 +1145,7 @@ document.getElementById('btnProcesarDocumento').addEventListener('click', async 
 
   try{
     archivoProcesado = file;
+    window.resumenDocumentoTemporal = null;
     let resultado;
 
     if(file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')){
@@ -1135,6 +1175,22 @@ document.getElementById('btnProcesarDocumento').addEventListener('click', async 
   }
 });
 
+document.getElementById('btnResumirDocumento').addEventListener('click', async ()=>{
+  const texto=document.getElementById('textoDocumentoExtraido').value.trim();
+  if(!texto){ alert('Primero procesá y revisá el contenido del documento.'); return; }
+  const modo=document.getElementById('modoResumenDocumento').value;
+  const estado=document.getElementById('estadoResumenDocumento');
+  const resultado=document.getElementById('resultadoResumenDocumento');
+  estado.textContent='Leyendo todo el material por bloques y verificando cobertura…';
+  resultado.innerHTML='';
+  try{
+    const data=await generarResumenYPreguntas(texto, modo);
+    window.resumenDocumentoTemporal={resumen:data.resumen,preguntas:data.preguntas||[],cobertura:data.cobertura,modo};
+    resultado.innerHTML=`<div class="resultado"><span class="sello-marca">COBERTURA ${data.cobertura.porcentaje}%</span><h4>Resumen generado</h4><div class="cuerpo">${escapeHtml(data.resumen)}</div><p class="ayuda">Se procesaron ${data.cobertura.cubiertos}/${data.cobertura.total} bloques. Modo: ${escapeHtml(modo)}.</p></div>`;
+    estado.textContent='✓ Resumen terminado. Revisá el resultado antes de guardar.';
+  }catch(e){ estado.textContent='⚠️ No se pudo resumir: '+e.message; }
+});
+
 document.getElementById('btnGuardarDocumento').addEventListener('click', ()=>{
   if(!archivoProcesado){ alert('Procesá primero un documento.'); return; }
 
@@ -1152,8 +1208,10 @@ document.getElementById('btnGuardarDocumento').addEventListener('click', ()=>{
     palabras: contarPalabras(texto),
     texto,
     notas: '',
-    resumen: '',
-    preguntas: []
+    resumen: window.resumenDocumentoTemporal?.resumen || '',
+    preguntas: window.resumenDocumentoTemporal?.preguntas || [],
+    coberturaResumen: window.resumenDocumentoTemporal?.cobertura || null,
+    modoResumen: window.resumenDocumentoTemporal?.modo || null
   };
 
   documentos.push(documento);
@@ -1173,6 +1231,9 @@ document.getElementById('btnGuardarDocumento').addEventListener('click', ()=>{
   document.getElementById('estadoDocumento').textContent = '✓ Material guardado correctamente en tu biblioteca.';
   archivoProcesado = null;
   textoProcesado = '';
+  window.resumenDocumentoTemporal = null;
+  document.getElementById('resultadoResumenDocumento').innerHTML='';
+  document.getElementById('estadoResumenDocumento').textContent='';
 });
 
 function renderBiblioteca(){
