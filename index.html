@@ -765,39 +765,274 @@ function extraerJson(texto){
   return JSON.parse(limpio.slice(inicio, fin+1));
 }
 
-function dividirParaCobertura(texto, limite=11000){
-  const bloques = texto.split(/\n{2,}|(?=--- PÁGINA \d+ ---)/).map(x=>x.trim()).filter(Boolean);
-  const partes=[]; let actual='';
+function dividirParaCobertura(texto, limite=7000){
+  const bloques = texto
+    .split(/\n{2,}|(?=--- PÁGINA \d+ ---)/)
+    .map(x => x.trim())
+    .filter(Boolean);
+
+  const partes = [];
+  let actual = '';
+
   for(const bloque of bloques){
-    if((actual+'\n\n'+bloque).length>limite && actual){ partes.push(actual); actual=bloque; }
-    else actual += (actual?'\n\n':'')+bloque;
+    if((actual + '\n\n' + bloque).length > limite && actual){
+      partes.push(actual);
+      actual = bloque;
+    } else {
+      actual += (actual ? '\n\n' : '') + bloque;
+    }
   }
+
   if(actual) partes.push(actual);
-  return partes.length?partes:[texto];
+
+  return partes.length ? partes : [texto];
 }
+
 
 function instruccionesResumen(modo){
-  if(modo==='repaso') return 'Hacé un repaso breve, pero no inventes ni cambies requisitos, excepciones, diferencias o procedimientos. Marcá lo que debe repasarse en el material completo.';
-  if(modo==='estudio') return 'Ordená el contenido para estudiar, eliminando sólo repeticiones. Conservá todos los conceptos, requisitos, excepciones, diferencias y procedimientos relevantes.';
-  return 'Prioridad absoluta: máxima cobertura. No hagas un resumen agresivo. Conservá todos los puntos relevantes, definiciones, requisitos, excepciones, diferencias, procedimientos, listas y advertencias. Si una parte es poco clara, indicá la duda en vez de inventar.';
+  if(modo === 'repaso'){
+    return 'Hacé un repaso breve, pero no inventes ni cambies requisitos, excepciones, diferencias o procedimientos. Marcá lo que debe repasarse en el material completo.';
+  }
+
+  if(modo === 'estudio'){
+    return 'Ordená el contenido para estudiar, eliminando sólo repeticiones. Conservá todos los conceptos, requisitos, excepciones, diferencias y procedimientos relevantes.';
+  }
+
+  return 'PRIORIDAD ABSOLUTA: MÁXIMA COBERTURA. No hagas un resumen agresivo. Conservá todos los puntos relevantes, definiciones, requisitos, excepciones, diferencias, procedimientos, listas, fechas, nombres, organismos, artículos, condiciones y advertencias. No elimines información importante para hacer el texto más corto. Si una parte es poco clara, indicá la duda en vez de inventar.';
 }
+
 
 async function generarResumenYPreguntas(notas, modo='completo'){
-  const partes=dividirParaCobertura(notas);
-  const sistemaBase = `Sos un tutor de preparación jurídica. Trabajás exclusivamente con el material recibido. No agregues conocimiento externo, no inventes y no completes vacíos. ${instruccionesResumen(modo)}\n\nRegla de cobertura: cada bloque recibido debe ser leído y representado en la salida o marcado expresamente como ilegible/ambiguo. Conservá la terminología del material y su organización cuando sea posible.`;
-  const resúmenes=[];
-  for(let i=0;i<partes.length;i++){
-    const salida=await llamarClaude(sistemaBase, `BLOQUE ${i+1} DE ${partes.length}:\n\n${partes[i]}\n\nDevolvé únicamente el resumen de este bloque, sin preguntas.`);
-    resúmenes.push(salida.trim());
+
+  const partes = dividirParaCobertura(notas, 7000);
+
+  const sistemaBase = `
+Sos un tutor de preparación jurídica.
+
+Trabajás EXCLUSIVAMENTE con el material recibido.
+
+NO agregues conocimiento externo.
+NO inventes información.
+NO completes vacíos con suposiciones.
+
+${instruccionesResumen(modo)}
+
+REGLA FUNDAMENTAL DE COBERTURA:
+
+Tenés que leer TODO el bloque recibido.
+
+No descartes información porque parezca secundaria.
+
+Conservá:
+- definiciones;
+- requisitos;
+- excepciones;
+- diferencias;
+- procedimientos;
+- pasos;
+- listas;
+- fechas;
+- nombres;
+- organismos;
+- artículos;
+- condiciones;
+- advertencias;
+- consecuencias jurídicas;
+- relaciones entre conceptos.
+
+Si algo resulta ilegible o ambiguo, indicá expresamente esa situación.
+
+No reduzcas el contenido simplemente para obtener un resumen corto.
+
+La prioridad es FIDELIDAD Y COBERTURA.
+`;
+
+  const resúmenes = [];
+  const errores = [];
+
+  for(let i = 0; i < partes.length; i++){
+
+    try{
+
+      const salida = await llamarClaude(
+        sistemaBase,
+        `BLOQUE ${i + 1} DE ${partes.length}
+
+Leé cuidadosamente TODO el bloque.
+
+Realizá un resumen completo y fiel de este bloque.
+
+No hagas preguntas.
+
+No hagas una introducción.
+
+No agregues información externa.
+
+TEXTO DEL BLOQUE:
+
+${partes[i]}`
+      );
+
+      if(salida && salida.trim()){
+        resúmenes.push(
+          `BLOQUE ${i + 1}:\n${salida.trim()}`
+        );
+      }else{
+        errores.push(i + 1);
+      }
+
+    }catch(error){
+
+      console.error(
+        'Error procesando bloque ' + (i + 1),
+        error
+      );
+
+      errores.push(i + 1);
+    }
   }
-  const combinado=resúmenes.join('\n\n');
-  const sistemaFinal=`Sos un editor jurídico. Uní los resúmenes parciales en un único resumen fiel al material. ${instruccionesResumen(modo)} No elimines contenido sólo para hacerlo corto. Mantené títulos y subtítulos cuando existan. Después generá entre 4 y 6 preguntas de práctica basadas solamente en el material. Devolvé SOLO JSON válido: {"resumen":"...","preguntas":[{"pregunta":"...","opciones":["a","b","c","d"],"correcta":0,"explicacion":"..."}]}`;
-  const texto=await llamarClaude(sistemaFinal, `RESÚMENES DE ${partes.length} BLOQUES:\n\n${combinado}`);
-  const data=extraerJson(texto);
-  data.cobertura={total:partes.length,cubiertos:resúmenes.filter(Boolean).length,porcentaje:Math.round((resúmenes.filter(Boolean).length/partes.length)*100)};
+
+  if(!resúmenes.length){
+    throw new Error(
+      'La IA no pudo procesar ninguno de los bloques del documento.'
+    );
+  }
+
+  /*
+   * Para evitar mandar una petición gigantesca a Gemini,
+   * la síntesis final también se hace por etapas.
+   */
+
+  let combinado = resúmenes.join('\n\n');
+
+  while(combinado.length > 18000){
+
+    const bloquesSintesis = dividirParaCobertura(
+      combinado,
+      7000
+    );
+
+    const parciales = [];
+
+    for(let i = 0; i < bloquesSintesis.length; i++){
+
+      try{
+
+        const parcial = await llamarClaude(
+          `
+Sos un editor jurídico.
+
+Trabajás exclusivamente con los resúmenes proporcionados.
+
+Conservá toda la información relevante.
+
+No inventes.
+No agregues conocimiento externo.
+No elimines requisitos, excepciones, diferencias, procedimientos, fechas, nombres, artículos ni advertencias.
+
+Unificá estos resúmenes parciales sin perder información.
+          `,
+          `RESÚMENES PARCIALES ${i + 1} DE ${bloquesSintesis.length}:
+
+${bloquesSintesis[i]}`
+        );
+
+        if(parcial && parcial.trim()){
+          parciales.push(parcial.trim());
+        }
+
+      }catch(error){
+
+        console.error(
+          'Error en síntesis intermedia',
+          error
+        );
+
+      }
+    }
+
+    if(!parciales.length){
+      throw new Error(
+        'No se pudo realizar la síntesis intermedia.'
+      );
+    }
+
+    combinado = parciales.join('\n\n');
+  }
+
+
+  const sistemaFinal = `
+Sos un editor jurídico especializado en material de estudio.
+
+Uní los resúmenes parciales en UN ÚNICO RESUMEN FINAL fiel al material original.
+
+${instruccionesResumen(modo)}
+
+NO inventes información.
+
+NO agregues conocimiento externo.
+
+NO elimines contenido importante simplemente para hacerlo más corto.
+
+Conservá, cuando existan:
+- títulos;
+- subtítulos;
+- definiciones;
+- requisitos;
+- excepciones;
+- diferencias;
+- procedimientos;
+- listas;
+- fechas;
+- nombres;
+- organismos;
+- artículos;
+- condiciones;
+- advertencias;
+- consecuencias jurídicas.
+
+El resultado debe servir para estudiar el material.
+
+Después generá entre 4 y 6 preguntas de práctica basadas EXCLUSIVAMENTE en el contenido proporcionado.
+
+Devolvé SOLO JSON válido, sin markdown, sin backticks y sin texto adicional.
+
+Formato exacto:
+
+{
+  "resumen": "...",
+  "preguntas": [
+    {
+      "pregunta": "...",
+      "opciones": ["a", "b", "c", "d"],
+      "correcta": 0,
+      "explicacion": "..."
+    }
+  ]
+}
+`;
+
+
+  const texto = await llamarClaude(
+    sistemaFinal,
+    `RESÚMENES PROCESADOS:
+
+${combinado}`
+  );
+
+  const data = extraerJson(texto);
+
+  data.cobertura = {
+    total: partes.length,
+    cubiertos: resúmenes.length,
+    porcentaje: Math.round(
+      (resúmenes.length / partes.length) * 100
+    ),
+    bloquesConError: errores
+  };
+
   return data;
 }
-
 
 /* ---- QUIZ ---- */
 function renderSelectorQuiz(){
