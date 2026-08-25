@@ -1,0 +1,8 @@
+{
+  "name":"Legajo Oficial de Justicia V4",
+  "short_name":"Legajo OJ",
+  "start_url":"./",
+  "display":"standalone",
+  "background_color":"#f4efe5",
+  "theme_color":"#6b1e1e"
+}
