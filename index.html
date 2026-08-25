@@ -512,13 +512,13 @@ function textoTemarioPlano(){
 
 async function cargarTemarioMarcado(){
   try{
-    const r = await window.storage.get('temario-marcado');
-    temarioMarcado = r ? JSON.parse(r.value) : {};
+    const r = localStorage.getItem('temario-marcado');
+    temarioMarcado = r ? JSON.parse(r) : {};
   }catch(e){ temarioMarcado = {}; }
   renderTemario();
 }
 async function guardarTemarioMarcado(){
-  try{ await window.storage.set('temario-marcado', JSON.stringify(temarioMarcado)); }
+  try{ localStorage.setItem('temario-marcado', JSON.stringify(temarioMarcado)); }
   catch(e){ console.error('No se pudo guardar el temario', e); mostrarBanner(); }
 }
 function renderTemario(){
@@ -552,8 +552,8 @@ function renderTemario(){
 async function cargarDatos(){
   let huboErrorAlCargar = false;
   try{
-    const r = await window.storage.get('clases-data');
-    clases = r ? JSON.parse(r.value) : null;
+    const r = localStorage.getItem('clases-data');
+    clases = r ? JSON.parse(r) : null;
   }catch(e){
     clases = null;
     huboErrorAlCargar = true;
@@ -585,7 +585,7 @@ async function cargarDatos(){
 
 async function guardarClases(intentoSilencioso){
   try{
-    await window.storage.set('clases-data', JSON.stringify(clases));
+    localStorage.setItem('clases-data', JSON.stringify(clases));
     ocultarBanner();
     return true;
   }catch(e){
@@ -1080,8 +1080,8 @@ function mostrarMejorMarca(){
 
 async function inicializarDigitacion(){
   try{
-    const r = await window.storage.get('digitacion-mejor');
-    mejorMarcaGuardada = r ? JSON.parse(r.value) : null;
+    const r = localStorage.getItem('digitacion-mejor');
+    mejorMarcaGuardada = r ? JSON.parse(r) : null;
   }catch(e){ mejorMarcaGuardada = null; }
   mostrarTextoObjetivo();
   mostrarMejorMarca();
