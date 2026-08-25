@@ -817,74 +817,121 @@ NO completes vacíos con suposiciones.
 
 ${instruccionesResumen(modo)}
 
-REGLA FUNDAMENTAL DE COBERTURA:
+PRIORIDAD ABSOLUTA: MÁXIMA COBERTURA.
 
-Tenés que leer TODO el bloque recibido.
+Conservá definiciones, requisitos, excepciones, diferencias,
+procedimientos, listas, fechas, nombres, organismos, artículos,
+condiciones, advertencias y consecuencias jurídicas.
 
-No descartes información porque parezca secundaria.
-
-Conservá:
-- definiciones;
-- requisitos;
-- excepciones;
-- diferencias;
-- procedimientos;
-- pasos;
-- listas;
-- fechas;
-- nombres;
-- organismos;
-- artículos;
-- condiciones;
-- advertencias;
-- consecuencias jurídicas;
-- relaciones entre conceptos.
-
-Si algo resulta ilegible o ambiguo, indicá expresamente esa situación.
-
-No reduzcas el contenido simplemente para obtener un resumen corto.
-
-La prioridad es FIDELIDAD Y COBERTURA.
+No hagas un resumen agresivo.
+No elimines información importante para hacerlo más corto.
 `;
 
   const resúmenes = [];
   const errores = [];
 
+  // Espera entre solicitudes para evitar alcanzar el límite de frecuencia.
+  const esperar = ms =>
+    new Promise(resolve => setTimeout(resolve, ms));
+
+  async function consultarConReintento(systemPrompt, userPrompt, numeroBloque){
+
+    const MAX_INTENTOS = 4;
+
+    for(let intento = 1; intento <= MAX_INTENTOS; intento++){
+
+      try{
+
+        const salida = await llamarClaude(
+          systemPrompt,
+          userPrompt
+        );
+
+        if(salida && salida.trim()){
+          return salida.trim();
+        }
+
+        throw new Error('La IA devolvió una respuesta vacía.');
+
+      }catch(error){
+
+        console.warn(
+          `Error en bloque ${numeroBloque}, intento ${intento}:`,
+          error
+        );
+
+        if(intento < MAX_INTENTOS){
+
+          // Espera progresiva:
+          // 1° reintento: 5 segundos
+          // 2° reintento: 10 segundos
+          // 3° reintento: 20 segundos
+          const espera = 5000 * Math.pow(2, intento - 1);
+
+          console.log(
+            `Esperando ${espera / 1000} segundos antes de reintentar...`
+          );
+
+          await esperar(espera);
+
+        }else{
+
+          throw error;
+        }
+      }
+    }
+
+    throw new Error(
+      `No se pudo procesar el bloque ${numeroBloque}.`
+    );
+  }
+
+
   for(let i = 0; i < partes.length; i++){
+
+    console.log(
+      `Procesando bloque ${i + 1} de ${partes.length}...`
+    );
 
     try{
 
-      const salida = await llamarClaude(
+      const salida = await consultarConReintento(
         sistemaBase,
-        `BLOQUE ${i + 1} DE ${partes.length}
+        `
+BLOQUE ${i + 1} DE ${partes.length}
 
-Leé cuidadosamente TODO el bloque.
+Leé TODO el bloque.
 
-Realizá un resumen completo y fiel de este bloque.
+Realizá un resumen completo y fiel.
 
 No hagas preguntas.
-
-No hagas una introducción.
 
 No agregues información externa.
 
 TEXTO DEL BLOQUE:
 
-${partes[i]}`
+${partes[i]}
+        `,
+        i + 1
       );
 
-      if(salida && salida.trim()){
-        resúmenes.push(
-          `BLOQUE ${i + 1}:\n${salida.trim()}`
-        );
-      }else{
-        errores.push(i + 1);
+      resúmenes.push(
+        `BLOQUE ${i + 1}:\n${salida}`
+      );
+
+      console.log(
+        `Bloque ${i + 1} procesado correctamente.`
+      );
+
+      // Pausa normal entre bloques.
+      if(i < partes.length - 1){
+        await esperar(5000);
       }
 
     }catch(error){
 
       console.error(
-        'Error procesando bloque ' + (i + 1),
+        `No se pudo procesar el bloque ${i + 1}:`,
         error
       );
 
@@ -892,91 +939,40 @@ ${partes[i]}`
     }
   }
 
+
   if(!resúmenes.length){
+
     throw new Error(
-      'La IA no pudo procesar ninguno de los bloques del documento.'
+      'La IA no pudo procesar ninguno de los bloques.'
     );
   }
+
 
   /*
-   * Para evitar mandar una petición gigantesca a Gemini,
-   * la síntesis final también se hace por etapas.
+   * Unimos los resultados.
    */
 
-  let combinado = resúmenes.join('\n\n');
+  const combinado = resúmenes.join('\n\n');
 
-  while(combinado.length > 18000){
 
-    const bloquesSintesis = dividirParaCobertura(
-      combinado,
-      7000
-    );
-
-    const parciales = [];
-
-    for(let i = 0; i < bloquesSintesis.length; i++){
-
-      try{
-
-        const parcial = await llamarClaude(
-          `
-Sos un editor jurídico.
-
-Trabajás exclusivamente con los resúmenes proporcionados.
-
-Conservá toda la información relevante.
-
-No inventes.
-No agregues conocimiento externo.
-No elimines requisitos, excepciones, diferencias, procedimientos, fechas, nombres, artículos ni advertencias.
-
-Unificá estos resúmenes parciales sin perder información.
-          `,
-          `RESÚMENES PARCIALES ${i + 1} DE ${bloquesSintesis.length}:
-
-${bloquesSintesis[i]}`
-        );
-
-        if(parcial && parcial.trim()){
-          parciales.push(parcial.trim());
-        }
-
-      }catch(error){
-
-        console.error(
-          'Error en síntesis intermedia',
-          error
-        );
-
-      }
-    }
-
-    if(!parciales.length){
-      throw new Error(
-        'No se pudo realizar la síntesis intermedia.'
-      );
-    }
-
-    combinado = parciales.join('\n\n');
-  }
-
+  /*
+   * Síntesis final.
+   *
+   * Esta llamada se hace solamente una vez después
+   * de procesar todos los bloques.
+   */
 
   const sistemaFinal = `
-Sos un editor jurídico especializado en material de estudio.
+Sos un editor jurídico.
 
-Uní los resúmenes parciales en UN ÚNICO RESUMEN FINAL fiel al material original.
+Uní los resúmenes parciales en un único resumen final fiel al material.
 
 ${instruccionesResumen(modo)}
 
 NO inventes información.
-
 NO agregues conocimiento externo.
 
-NO elimines contenido importante simplemente para hacerlo más corto.
-
-Conservá, cuando existan:
-- títulos;
-- subtítulos;
+Conservá:
 - definiciones;
 - requisitos;
 - excepciones;
@@ -991,13 +987,14 @@ Conservá, cuando existan:
 - advertencias;
 - consecuencias jurídicas.
 
-El resultado debe servir para estudiar el material.
+No elimines información importante solamente para hacer el resultado más corto.
 
-Después generá entre 4 y 6 preguntas de práctica basadas EXCLUSIVAMENTE en el contenido proporcionado.
+Después generá entre 4 y 6 preguntas de práctica basadas EXCLUSIVAMENTE
+en el material recibido.
 
-Devolvé SOLO JSON válido, sin markdown, sin backticks y sin texto adicional.
+Devolvé SOLO JSON válido.
 
-Formato exacto:
+Formato:
 
 {
   "resumen": "...",
@@ -1013,14 +1010,31 @@ Formato exacto:
 `;
 
 
-  const texto = await llamarClaude(
-    sistemaFinal,
-    `RESÚMENES PROCESADOS:
+  let textoFinal;
 
-${combinado}`
-  );
+  try{
 
-  const data = extraerJson(texto);
+    textoFinal = await consultarConReintento(
+      sistemaFinal,
+      `
+RESÚMENES DE LOS BLOQUES PROCESADOS:
+
+${combinado}
+      `,
+      'síntesis final'
+    );
+
+  }catch(error){
+
+    throw new Error(
+      'Los bloques fueron procesados, pero Gemini no pudo realizar la síntesis final. ' +
+      'Esperá unos segundos y volvé a intentarlo.'
+    );
+  }
+
+
+  const data = extraerJson(textoFinal);
+
 
   data.cobertura = {
     total: partes.length,
@@ -1030,6 +1044,7 @@ ${combinado}`
     ),
     bloquesConError: errores
   };
+
 
   return data;
 }
