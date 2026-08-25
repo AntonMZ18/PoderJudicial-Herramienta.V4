@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+  <link rel="icon" href="data:,">
 <meta charset="UTF-8">
 <title>Legajo de Estudio — Oficial de Justicia Junior</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -434,7 +435,8 @@
 </main>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
 /* ==================== V4: BIBLIOTECA Y ENTRENAMIENTO ==================== */
 let documentosV4 = [];
 let razonamientosV4 = [];
@@ -707,7 +709,7 @@ function renderClases(){
         mostrarResumen(item, c);
         renderSelectorQuiz();
       }catch(err){
-        mostrarError(item, 'No se pudo generar el resumen. Probá de nuevo en un momento.');
+        mostrarError(item, 'No se pudo generar el resumen. ' + (err?.message || 'Verificá la conexión con la IA.'));
       }finally{
         btn.disabled=false; loader.style.display='none';
       }
@@ -739,7 +741,7 @@ function escapeHtml(s){
 
 const CONFIG = {
   // Para publicar la app, configuraremos aquí la URL de un backend seguro.
-  apiUrl: ''
+  apiUrl: localStorage.getItem('legajo-api-url') || ''
 };
 
 async function llamarClaude(systemPrompt, userPrompt){
