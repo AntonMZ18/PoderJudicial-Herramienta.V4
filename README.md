@@ -1,15 +1,13 @@
-# Legajo Oficial de Justicia — V4
+# Legajo Oficial de Justicia — V4.1
 
-Proyecto de estudio y entrenamiento para aspirantes al cargo de Oficial de Justicia.
+Mejora principal: resúmenes con cobertura por bloques.
 
-## Publicación gratuita en GitHub Pages
-1. Crear un repositorio nuevo.
-2. Subir el contenido de esta carpeta.
-3. Ir a Settings → Pages.
-4. Elegir Deploy from a branch.
-5. Seleccionar `main` y la carpeta `/(root)`.
+- Lee materiales largos por secciones.
+- Procesa cada bloque antes de construir el resumen final.
+- Tres modos: completo, estudio y repaso rápido.
+- Muestra auditoría básica de cobertura.
+- No debe completar vacíos con conocimiento externo.
+- Conserva preguntas de práctica y la base de la V4.
 
-No requiere servidor para las funciones locales. Los apuntes, progreso y documentos se guardan en el navegador del usuario y pueden exportarse como copia de seguridad.
-
-## V4
-Esta versión conserva la base V3 y añade una Biblioteca de Conocimiento local, carga de PDFs/apuntes/transcripciones, clasificación del material y el modo “Pensar como Oficial de Justicia”.
+## GitHub Pages
+Publicar desde la rama `main` y la carpeta `/(root)`.
