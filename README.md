@@ -1,12 +1,28 @@
-ENTRENADOR DE OFICIAL DE JUSTICIA — VERSIÓN BÚSQUEDA MEJORADA
+ENTRENADOR DE OFICIAL DE JUSTICIA — ESTUDIO TOTAL
 
-Abrir index.html con Chrome/Edge/Firefox.
+Versión autónoma para estudio local/GitHub Pages.
+No usa APIs, backend ni servicios pagos.
 
-La búsqueda de Aprender y Banco de preguntas:
-- acepta términos con o sin tildes;
-- reconoce variantes y términos relacionados;
-- Aprender consulta las fichas y fragmentos del apunte del cursillo;
-- Banco de preguntas busca también en opciones y explicaciones;
-- Repaso activo permite filtrar por tema.
+ABRIR LOCALMENTE
+1. Abrí index.html con Chrome/Edge/Firefox.
 
-Todo funciona localmente, sin API ni servidor de pago.
+GITHUB PAGES
+1. Subí el contenido de esta carpeta a tu repositorio.
+2. Configurá Pages para servir desde la rama/carpeta donde está index.html.
+
+HERRAMIENTAS
+- Inicio: plan 17 al 25 de septiembre y estadísticas.
+- Ruta: mapa de 13 temas, material del apunte, comprensión y dominio.
+- Aprender: búsqueda tolerante a tildes y consulta de 288 fragmentos del apunte.
+- Entrenar: memoria activa con clasificación de dominio local.
+- Repasar: fichas activas.
+- Quiz: preguntas con filtros y preguntas trampa.
+- Casos: práctica aplicada.
+- Diferencias: conceptos que pueden confundirse.
+- Documentos: checklist de cédula, mandamiento y acta.
+- Redacción: prácticas, modelos orientativos y autocorrección.
+- Simulacro: 20 preguntas con tiempo.
+- Mis errores: registro local.
+
+IMPORTANTE
+Los modelos y ejercicios son de práctica basados en el cursillo proporcionado. No son formularios oficiales ni garantizan preguntas del examen.
