@@ -1,13 +1,12 @@
-# Legajo Oficial de Justicia — V4.1
+ENTRENADOR DE OFICIAL DE JUSTICIA — VERSIÓN BÚSQUEDA MEJORADA
 
-Mejora principal: resúmenes con cobertura por bloques.
+Abrir index.html con Chrome/Edge/Firefox.
 
-- Lee materiales largos por secciones.
-- Procesa cada bloque antes de construir el resumen final.
-- Tres modos: completo, estudio y repaso rápido.
-- Muestra auditoría básica de cobertura.
-- No debe completar vacíos con conocimiento externo.
-- Conserva preguntas de práctica y la base de la V4.
+La búsqueda de Aprender y Banco de preguntas:
+- acepta términos con o sin tildes;
+- reconoce variantes y términos relacionados;
+- Aprender consulta las fichas y fragmentos del apunte del cursillo;
+- Banco de preguntas busca también en opciones y explicaciones;
+- Repaso activo permite filtrar por tema.
 
-## GitHub Pages
-Publicar desde la rama `main` y la carpeta `/(root)`.
+Todo funciona localmente, sin API ni servidor de pago.
